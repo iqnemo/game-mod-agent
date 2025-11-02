@@ -1,0 +1,4 @@
+scrapy
+selectolax
+sqlite-utils
+python-dotenv
