@@ -2,9 +2,10 @@
 __pycache__/
 .env
 *.sqlite*
-index/*
+index/
 data/**
 logs/**
 *.pyc
 .DS_Store
 .vscode/
+chroma_db/

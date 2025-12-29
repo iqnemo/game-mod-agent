@@ -1,4 +1,7 @@
-scrapy
-selectolax
-sqlite-utils
+langchain
+langchain-community
+langchain-google-genai
+chromadb
+beautifulsoup4
+requests
 python-dotenv
