@@ -58,7 +58,7 @@ def index_data(text: str, url: str):
     documents = [Document(page_content=chunk, metadata={"source": url}) for chunk in chunks]
 
     print("Initializing Vector Store...")
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
 
     vector_store=Chroma.from_documents(
         documents=documents,
