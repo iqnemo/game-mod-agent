@@ -5,3 +5,4 @@ chromadb
 beautifulsoup4
 requests
 python-dotenv
+openai
