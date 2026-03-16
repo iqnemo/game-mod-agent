@@ -4,8 +4,8 @@ import json
 import pathlib
 from typing import Any
 
-from ingest.models import IngestDocument, SourceConfig
-from ingest.sources.common import slugify
+from ..models import IngestDocument, SourceConfig
+from .common import slugify
 
 
 def _extract_discord_message_text(message: dict[str, Any]) -> str:
@@ -71,6 +71,8 @@ def discord_documents_from_export(path: pathlib.Path) -> tuple[SourceConfig, lis
     guild_name = str(guild.get("name") or "").strip()
     channel_id = str(channel.get("id") or "").strip()
     channel_name = str(channel.get("name") or "").strip()
+    game_name = str(raw.get("game") or raw.get("franchise") or "").strip() or "Unknown"
+    mod_name = str(raw.get("mod") or raw.get("mod_name") or "").strip() or None
 
     source_name = guild_name or path.stem
     source_key = f"discord_{slugify(source_name) or 'unknown'}"
@@ -83,8 +85,8 @@ def discord_documents_from_export(path: pathlib.Path) -> tuple[SourceConfig, lis
     source_cfg = SourceConfig(
         source_key=source_key,
         source_type="discord",
-        game="Terraria",
-        mod="Calamity",
+        game=game_name,
+        mod=mod_name,
         base_url=base_url,
     )
 

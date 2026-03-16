@@ -13,8 +13,8 @@ from langchain_core.documents import Document
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from ingest.models import ChunkPayload, IngestDocument, SourceConfig
-from ingest.storage import (
+from .models import ChunkPayload, IngestDocument, SourceConfig
+from .storage import (
     count_chunks_for_version,
     ensure_source,
     get_current_version,
@@ -40,6 +40,36 @@ def split_text(text: str) -> list[str]:
 
 def chunk_payloads_from_text(text: str) -> list[ChunkPayload]:
     return [ChunkPayload(text=chunk_text) for chunk_text in split_text(text)]
+
+
+def _content_fingerprint(
+    ingest_doc: IngestDocument,
+    chunks: list[ChunkPayload],
+) -> str:
+    payload = {
+        "content_type": ingest_doc.content_type,
+        "title": ingest_doc.title,
+        "external_id": ingest_doc.external_id,
+        "language": ingest_doc.language,
+        "text": ingest_doc.text,
+        "metadata": ingest_doc.metadata,
+        "chunks": [
+            {
+                "text": chunk.text,
+                "start_sec": chunk.start_sec,
+                "end_sec": chunk.end_sec,
+            }
+            for chunk in chunks
+        ],
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def build_vector_store() -> Chroma:
@@ -144,7 +174,7 @@ def ingest_document(
             now_ts=now_ts,
         )
 
-        content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        content_hash = _content_fingerprint(ingest_doc, chunks)
         current = get_current_version(conn, document_id)
         if current and current["content_hash"] == content_hash:
             conn.commit()

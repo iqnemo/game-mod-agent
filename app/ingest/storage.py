@@ -4,7 +4,7 @@ import pathlib
 import sqlite3
 from typing import Optional
 
-from ingest.models import ChunkPayload, SourceConfig
+from .models import ChunkPayload, SourceConfig
 
 DB_PATH = "index/kb.sqlite"
 

@@ -3,18 +3,23 @@ from __future__ import annotations
 import argparse
 import pathlib
 import sqlite3
+import sys
 
 from dotenv import find_dotenv, load_dotenv
 from langchain_community.vectorstores import Chroma
 
-from ingest.pipeline import build_vector_store, ingest_document
-from ingest.sources import (
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from app.ingest.pipeline import build_vector_store, ingest_document
+from app.ingest.sources import (
     default_wiki_source,
+    discover_wiki_urls,
     discord_documents_from_export,
     wiki_document_from_url,
     youtube_document_from_transcript,
 )
-from ingest.storage import get_db_connection
+from app.ingest.storage import get_db_connection
 
 load_dotenv(find_dotenv())
 
@@ -26,6 +31,24 @@ def parse_args() -> argparse.Namespace:
         action="append",
         default=[],
         help="Wiki page URL to ingest. Repeat for multiple pages.",
+    )
+    parser.add_argument(
+        "--wiki-seed",
+        action="append",
+        default=[],
+        help="Seed wiki URL for recursive discovery (same-domain wiki pages only).",
+    )
+    parser.add_argument(
+        "--wiki-max-depth",
+        type=int,
+        default=1,
+        help="Maximum crawl depth from each --wiki-seed URL.",
+    )
+    parser.add_argument(
+        "--wiki-max-pages",
+        type=int,
+        default=200,
+        help="Maximum discovered wiki pages across all seeds.",
     )
     parser.add_argument(
         "--discord-export",
@@ -52,7 +75,7 @@ def _ingest_wiki_urls(
 
     source_cfg = default_wiki_source()
     for wiki_url in wiki_urls:
-        doc = wiki_document_from_url(wiki_url)
+        doc = wiki_document_from_url(wiki_url, allowed_base_url=source_cfg.base_url)
         if doc is None:
             skipped_count += 1
             continue
@@ -70,6 +93,20 @@ def _ingest_wiki_urls(
             skipped_count += 1
 
     return indexed_count, skipped_count
+
+
+def _merge_unique_urls(urls: list[str]) -> list[str]:
+    seen: set[str] = set()
+    merged: list[str] = []
+    for url in urls:
+        clean = url.strip()
+        if not clean:
+            continue
+        if clean in seen:
+            continue
+        seen.add(clean)
+        merged.append(clean)
+    return merged
 
 
 def _ingest_discord_exports(
@@ -154,10 +191,30 @@ def main() -> None:
     args = parse_args()
 
     wiki_urls = list(args.wiki_url)
+    wiki_seeds = list(args.wiki_seed)
     discord_exports = [pathlib.Path(path) for path in args.discord_export]
     youtube_transcripts = [pathlib.Path(path) for path in args.youtube_transcript]
 
-    if not wiki_urls and not discord_exports and not youtube_transcripts:
+    if wiki_seeds:
+        try:
+            discovered_urls = discover_wiki_urls(
+                seed_urls=wiki_seeds,
+                max_depth=args.wiki_max_depth,
+                max_pages=args.wiki_max_pages,
+                allowed_base_url=default_wiki_source().base_url,
+            )
+        except Exception as exc:
+            print(f"Failed to discover wiki links from seeds: {exc}")
+            discovered_urls = []
+
+        if discovered_urls:
+            print(
+                f"Discovered {len(discovered_urls)} wiki page(s) "
+                f"from {len(wiki_seeds)} seed URL(s)."
+            )
+        wiki_urls = _merge_unique_urls(wiki_urls + discovered_urls)
+
+    if not wiki_urls and not wiki_seeds and not discord_exports and not youtube_transcripts:
         wiki_urls = ["https://calamitymod.wiki.gg/wiki/Supreme_Calamitas"]
 
     conn = get_db_connection()

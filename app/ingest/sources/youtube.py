@@ -4,8 +4,8 @@ import json
 import pathlib
 from typing import Any
 
-from ingest.models import ChunkPayload, IngestDocument, SourceConfig
-from ingest.sources.common import coerce_float, first_present, slugify
+from ..models import ChunkPayload, IngestDocument, SourceConfig
+from .common import coerce_float, first_present, slugify
 
 
 def youtube_document_from_transcript(path: pathlib.Path) -> tuple[SourceConfig, IngestDocument]:
@@ -34,6 +34,8 @@ def youtube_document_from_transcript(path: pathlib.Path) -> tuple[SourceConfig, 
         or video_obj.get("upload_date")
         or ""
     ).strip() or None
+    game_name = str(raw.get("game") or video_obj.get("game") or "").strip() or "Unknown"
+    mod_name = str(raw.get("mod") or video_obj.get("mod") or "").strip() or None
     canonical_uri = str(
         raw.get("url")
         or raw.get("video_url")
@@ -106,8 +108,8 @@ def youtube_document_from_transcript(path: pathlib.Path) -> tuple[SourceConfig, 
     source_cfg = SourceConfig(
         source_key=f"youtube_{slugify(channel_name) or 'unknown'}",
         source_type="youtube",
-        game="Terraria",
-        mod="Calamity",
+        game=game_name,
+        mod=mod_name,
         base_url="https://www.youtube.com",
     )
 

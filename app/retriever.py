@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import argparse
 import os
+import pathlib
+import sys
 from typing import Optional
 
 from dotenv import find_dotenv, load_dotenv
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 load_dotenv(find_dotenv())
 

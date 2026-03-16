@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import argparse
 import os
+import pathlib
+import sys
 
 from dotenv import find_dotenv, load_dotenv
 from openai import OpenAI
 
-from retriever import retrieve
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from app.retriever import retrieve
 
 load_dotenv(find_dotenv())
 
@@ -47,7 +52,7 @@ def answer_question(question: str, k: int, source_type: str | None) -> str:
     trimmed_context = joined_context[:max_chars]
 
     system_prompt = (
-        "You are a Terraria/Calamity assistant using retrieved context. "
+        "You are a game and mod assistant using retrieved context. "
         "Answer using only the supplied context. If context is incomplete, say that explicitly. "
         "Always cite sources as [1], [2], etc in your answer."
     )
