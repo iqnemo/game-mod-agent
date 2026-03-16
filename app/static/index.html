@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>game-mod-agent</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main class="layout">
+      <section class="panel hero">
+        <p class="eyebrow">RAG Chat</p>
+        <h1>Game and Mod Knowledge Chat</h1>
+        <p class="lede">
+          Ask questions against your indexed game sources. Choose a game, select one or more mods,
+          and keep base game results included by default.
+        </p>
+      </section>
+
+      <section class="panel controls">
+        <div class="field">
+          <label for="game-select">Game</label>
+          <select id="game-select">
+            <option value="">All games</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="source-type">Source Type</label>
+          <select id="source-type">
+            <option value="">All sources</option>
+            <option value="wiki">Wiki</option>
+            <option value="discord">Discord</option>
+            <option value="youtube">YouTube</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <span>Mods</span>
+          <div id="mods-list" class="mods-list"></div>
+        </div>
+
+        <label class="checkbox">
+          <input type="checkbox" id="include-base-game" checked>
+          <span>Include base game results when mods are selected</span>
+        </label>
+      </section>
+
+      <section class="panel composer">
+        <label for="question">Question</label>
+        <textarea id="question" rows="4" placeholder="How do I handle phase 2 of this boss fight?"></textarea>
+        <div class="composer-row">
+          <button id="send-button" type="button">Ask</button>
+          <p id="status" class="status"></p>
+        </div>
+      </section>
+
+      <section class="panel answer-panel">
+        <h2>Answer</h2>
+        <div id="answer" class="answer empty">Ask a question to get started.</div>
+      </section>
+
+      <section class="panel sources-panel">
+        <div class="sources-header">
+          <h2>Retrieved Sources</h2>
+          <button id="debug-button" type="button" class="secondary">Inspect Retrieval</button>
+        </div>
+        <div id="sources" class="sources empty">No sources yet.</div>
+      </section>
+    </main>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

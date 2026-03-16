@@ -13,6 +13,7 @@ from langchain_core.documents import Document
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from ..settings import CHROMA_DIR, COLLECTION_NAME, EMBEDDING_MODEL
 from .models import ChunkPayload, IngestDocument, SourceConfig
 from .storage import (
     count_chunks_for_version,
@@ -23,9 +24,27 @@ from .storage import (
     upsert_document,
 )
 
-CHROMA_DIR = "chroma_db"
-COLLECTION_NAME = "knowledge_base"
-EMBEDDING_MODEL = "models/text-embedding-004"
+
+def _normalized_mods(source: SourceConfig, ingest_doc: IngestDocument) -> tuple[str, ...]:
+    mods_value = ingest_doc.metadata.get("mods")
+    if isinstance(mods_value, (list, tuple, set)):
+        mods = []
+        seen: set[str] = set()
+        for value in mods_value:
+            text = str(value).strip()
+            if not text:
+                continue
+            key = text.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            mods.append(text)
+        if mods:
+            return tuple(mods)
+
+    if source.mod:
+        return (source.mod,)
+    return ()
 
 
 def split_text(text: str) -> list[str]:
@@ -113,9 +132,15 @@ def add_chunks_to_chroma(
         "mod": source.mod,
         "content_type": ingest_doc.content_type,
         "canonical_uri": ingest_doc.canonical_uri,
+        "title": ingest_doc.title,
+        "external_id": ingest_doc.external_id,
+        "language": ingest_doc.language,
         "document_id": document_id,
         "version_id": version_id,
     }
+    normalized_mods = _normalized_mods(source, ingest_doc)
+    base_metadata["mods_csv"] = "|".join(normalized_mods)
+    base_metadata["is_base_game"] = len(normalized_mods) == 0
 
     for key, value in ingest_doc.metadata.items():
         scalar = _to_chroma_scalar(value)

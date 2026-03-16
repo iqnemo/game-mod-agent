@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import pathlib
 import sqlite3
 from typing import Optional
 
 from .models import ChunkPayload, SourceConfig
+from ..query import metadata_mods, normalize_text
 
 DB_PATH = "index/kb.sqlite"
 
@@ -152,3 +154,51 @@ def store_chunks_in_db(
         """,
         rows,
     )
+
+
+def list_available_filters(conn: sqlite3.Connection) -> list[dict]:
+    game_to_mods: dict[str, set[str]] = {}
+    rows = conn.execute(
+        """
+        SELECT
+            s.game AS source_game,
+            s.mod AS source_mod,
+            c.metadata_json AS metadata_json
+        FROM document_versions dv
+        JOIN documents d ON d.document_id = dv.document_id
+        JOIN sources s ON s.source_id = d.source_id
+        LEFT JOIN chunks c ON c.version_id = dv.version_id AND c.chunk_index = 0
+        WHERE dv.is_current = 1
+        """
+    ).fetchall()
+
+    for row in rows:
+        metadata: dict = {}
+        metadata_json = row["metadata_json"]
+        if isinstance(metadata_json, str) and metadata_json.strip():
+            try:
+                parsed = json.loads(metadata_json)
+                if isinstance(parsed, dict):
+                    metadata = parsed
+            except json.JSONDecodeError:
+                metadata = {}
+
+        game = normalize_text(metadata.get("game")) or normalize_text(row["source_game"])
+        if game is None or game.casefold() == "unknown":
+            continue
+
+        mods = set(metadata_mods(metadata))
+        source_mod = normalize_text(row["source_mod"])
+        if source_mod:
+            mods.add(source_mod)
+
+        bucket = game_to_mods.setdefault(game, set())
+        for mod in mods:
+            if mod.casefold() == "unknown":
+                continue
+            bucket.add(mod)
+
+    return [
+        {"game": game, "mods": sorted(mods, key=str.casefold)}
+        for game, mods in sorted(game_to_mods.items(), key=lambda item: item[0].casefold())
+    ]
