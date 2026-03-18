@@ -15,9 +15,9 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from app.ingest.storage import get_db_connection, list_available_filters
-from app.qa import answer_question_details
-from app.query import RetrievalFilters
-from app.retriever import retrieve
+from app.rag.qa import answer_question_details
+from app.rag.query import RetrievalFilters
+from app.rag.retriever import retrieve
 from app.settings import DEFAULT_WEB_HOST, DEFAULT_WEB_PORT, get_int_env
 
 STATIC_DIR = pathlib.Path(__file__).resolve().parent / "static"

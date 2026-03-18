@@ -55,10 +55,10 @@
 .venv/bin/python -m app.indexer --youtube-transcript data/youtube/supreme_calamitas_guide.json
 
 # retrieve top matching chunks
-.venv/bin/python -m app.retriever "how does supreme calamitas phase 2 work?" --k 6
+.venv/bin/python -m app.rag.retriever "how does supreme calamitas phase 2 work?" --k 6
 
 # ask the RAG pipeline a question
-.venv/bin/python -m app.qa "how do i dodge supreme calamitas bullet hell?" --k 6
+.venv/bin/python -m app.rag.qa "how do i dodge supreme calamitas bullet hell?" --k 6
 
 # quick OpenAI connectivity smoke test
 .venv/bin/python smoke_test.py

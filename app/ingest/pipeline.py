@@ -1,19 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import hashlib
 import json
-import os
-import pathlib
 import sqlite3
 import time
 from typing import Any, Optional
 
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from ..settings import CHROMA_DIR, COLLECTION_NAME, EMBEDDING_MODEL
+from ..rag.query import normalize_mods
 from .models import ChunkPayload, IngestDocument, SourceConfig
 from .storage import (
     count_chunks_for_version,
@@ -28,19 +26,9 @@ from .storage import (
 def _normalized_mods(source: SourceConfig, ingest_doc: IngestDocument) -> tuple[str, ...]:
     mods_value = ingest_doc.metadata.get("mods")
     if isinstance(mods_value, (list, tuple, set)):
-        mods = []
-        seen: set[str] = set()
-        for value in mods_value:
-            text = str(value).strip()
-            if not text:
-                continue
-            key = text.casefold()
-            if key in seen:
-                continue
-            seen.add(key)
-            mods.append(text)
+        mods = normalize_mods(mods_value)
         if mods:
-            return tuple(mods)
+            return mods
 
     if source.mod:
         return (source.mod,)
@@ -89,22 +77,6 @@ def _content_fingerprint(
         default=str,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
-
-
-def build_vector_store() -> Chroma:
-    google_api_key = os.getenv("GOOGLE_API_KEY", "").strip()
-    if not google_api_key or google_api_key.startswith("your_"):
-        raise RuntimeError(
-            "GOOGLE_API_KEY is missing. Set it in .env before running app/indexer.py."
-        )
-
-    pathlib.Path(CHROMA_DIR).mkdir(parents=True, exist_ok=True)
-    embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL)
-    return Chroma(
-        collection_name=COLLECTION_NAME,
-        persist_directory=CHROMA_DIR,
-        embedding_function=embeddings,
-    )
 
 
 def _to_chroma_scalar(value: Any) -> Optional[Any]:
@@ -172,6 +144,8 @@ def ingest_document(
     vector_store: Chroma,
     source: SourceConfig,
     ingest_doc: IngestDocument,
+    *,
+    status_writer: Callable[[str], None] | None = None,
 ) -> bool:
     text = ingest_doc.text.strip()
     if not text:
@@ -227,8 +201,9 @@ def ingest_document(
         conn.rollback()
         raise
 
-    print(
-        f"Indexed {len(chunks)} chunks from {ingest_doc.canonical_uri} "
-        f"(content_type={ingest_doc.content_type}, version_id={version_id})."
-    )
+    if status_writer is not None:
+        status_writer(
+            f"Indexed {len(chunks)} chunks from {ingest_doc.canonical_uri} "
+            f"(content_type={ingest_doc.content_type}, version_id={version_id})."
+        )
     return True

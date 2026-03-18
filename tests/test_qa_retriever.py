@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from langchain_core.documents import Document
 
-from app.qa import build_completion_request
-from app.query import RetrievalFilters
-from app.retriever import _select_diverse_documents
+from app.rag.qa import build_completion_request
+from app.rag.query import RetrievalFilters
+from app.rag.retriever import _select_diverse_documents, retrieve
 
 
 class QaRetrieverTests(unittest.TestCase):
@@ -82,6 +82,29 @@ class QaRetrieverTests(unittest.TestCase):
         self.assertIn("Requested scope:", prompt)
         self.assertIn("game=Terraria", prompt)
         self.assertIn("mods=Calamity", prompt)
+
+    def test_retrieve_pushes_down_game_and_source_type_together(self) -> None:
+        fake_store = Mock()
+        fake_store.similarity_search.return_value = [
+            Document(
+                page_content="context",
+                metadata={
+                    "canonical_uri": "doc-a",
+                    "game": "Terraria",
+                    "source_type": "wiki",
+                },
+            )
+        ]
+        filters = RetrievalFilters.from_inputs(game="Terraria", source_type="wiki")
+
+        with patch("app.rag.retriever.build_vector_store", return_value=fake_store):
+            docs = retrieve("question", k=1, filters=filters)
+
+        self.assertEqual(["context"], [doc.page_content for doc in docs])
+        self.assertEqual(
+            {"game": "Terraria", "source_type": "wiki"},
+            fake_store.similarity_search.call_args.kwargs["filter"],
+        )
 
 
 if __name__ == "__main__":

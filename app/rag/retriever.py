@@ -1,46 +1,28 @@
 from __future__ import annotations
 
 import argparse
-import os
 import pathlib
 import sys
 from typing import Optional
 
 from dotenv import find_dotenv, load_dotenv
-from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 if __package__ in {None, ""}:
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from app.query import RetrievalFilters, metadata_mods
-from app.settings import (
-    CHROMA_DIR,
-    COLLECTION_NAME,
+from ..settings import (
     DEFAULT_FILTERED_FETCH_K,
     DEFAULT_FETCH_K_MULTIPLIER,
     DEFAULT_MAX_CHUNKS_PER_DOCUMENT,
     DEFAULT_MIN_FETCH_K,
     DEFAULT_RETRIEVAL_K,
-    EMBEDDING_MODEL,
     get_int_env,
 )
+from .query import RetrievalFilters, add_retrieval_args, filters_from_args, metadata_mods
+from .vector_store import build_vector_store
 
 load_dotenv(find_dotenv())
-
-
-def get_vector_store() -> Chroma:
-    google_api_key = os.getenv("GOOGLE_API_KEY", "").strip()
-    if not google_api_key or google_api_key.startswith("your_"):
-        raise RuntimeError("GOOGLE_API_KEY is missing. Set it in .env before retrieval.")
-
-    embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL)
-    return Chroma(
-        collection_name=COLLECTION_NAME,
-        persist_directory=CHROMA_DIR,
-        embedding_function=embeddings,
-    )
 
 
 def _document_key(doc: Document) -> str:
@@ -93,14 +75,6 @@ def _select_diverse_documents(
     return selected
 
 
-def _base_filter(filters: RetrievalFilters) -> Optional[dict]:
-    if filters.game:
-        return {"game": filters.game}
-    if filters.source_type:
-        return {"source_type": filters.source_type}
-    return None
-
-
 def _apply_filters(candidates: list[Document], filters: RetrievalFilters) -> list[Document]:
     return [doc for doc in candidates if filters.matches_metadata(doc.metadata)]
 
@@ -109,22 +83,15 @@ def retrieve(
     query: str,
     k: int = DEFAULT_RETRIEVAL_K,
     filters: Optional[RetrievalFilters] = None,
-    source_type: Optional[str] = None,
 ) -> list[Document]:
     if k < 1:
         raise ValueError("k must be >= 1")
 
-    if filters is None:
-        filters = RetrievalFilters.from_inputs(source_type=source_type)
-    elif source_type is not None and filters.source_type is None:
-        filters = RetrievalFilters.from_inputs(
-            game=filters.game,
-            mods=filters.mods,
-            include_base_game=filters.include_base_game,
-            source_type=source_type,
-        )
+    filters = filters or RetrievalFilters()
 
-    vector_store = get_vector_store()
+    vector_store = build_vector_store(
+        missing_key_message="GOOGLE_API_KEY is missing. Set it in .env before retrieval."
+    )
     default_fetch_k = max(k * DEFAULT_FETCH_K_MULTIPLIER, DEFAULT_MIN_FETCH_K)
     if filters.game or filters.mods or filters.source_type:
         default_fetch_k = max(default_fetch_k, DEFAULT_FILTERED_FETCH_K)
@@ -142,7 +109,7 @@ def retrieve(
         minimum=1,
     )
 
-    base_filter = _base_filter(filters)
+    base_filter = filters.vector_store_filter()
     if base_filter:
         candidates = vector_store.similarity_search(query, k=fetch_k, filter=base_filter)
     else:
@@ -166,32 +133,13 @@ def _source_label(metadata: dict) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Retrieve chunks from Chroma")
-    parser.add_argument("query", help="Question or search query")
-    parser.add_argument("--k", type=int, default=DEFAULT_RETRIEVAL_K, help="Number of chunks to return")
-    parser.add_argument(
-        "--source-type",
-        choices=["wiki", "discord", "youtube"],
-        default=None,
-        help="Optional source filter",
-    )
-    parser.add_argument("--game", default=None, help="Optional game filter")
-    parser.add_argument("--mod", action="append", default=[], help="Repeatable mod filter")
-    parser.add_argument(
-        "--exclude-base-game",
-        action="store_true",
-        help="When using --mod, exclude base game results.",
-    )
+    add_retrieval_args(parser)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    filters = RetrievalFilters.from_inputs(
-        game=args.game,
-        mods=args.mod,
-        include_base_game=not args.exclude_base_game,
-        source_type=args.source_type,
-    )
+    filters = filters_from_args(args)
     docs = retrieve(query=args.query, k=args.k, filters=filters)
 
     if not docs:

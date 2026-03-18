@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+import io
 import sqlite3
 import unittest
 
@@ -70,6 +72,24 @@ class AuditRegressionTests(unittest.TestCase):
             )
         )
         self.assertEqual([(1, 0), (2, 1)], [(row["version_id"], row["is_current"]) for row in versions])
+
+    def test_ingest_document_is_quiet_without_status_writer(self) -> None:
+        doc = IngestDocument(
+            content_type="youtube_transcript",
+            canonical_uri="https://www.youtube.com/watch?v=abc123",
+            title="Guide",
+            external_id="abc123",
+            language="en",
+            text="same text",
+            metadata={"channel_name": "Channel A"},
+            chunk_overrides=[ChunkPayload(text="same text", start_sec=0.0, end_sec=5.0)],
+        )
+        captured = io.StringIO()
+
+        with redirect_stdout(captured):
+            self.assertTrue(ingest_document(self.conn, self.vector_store, self.source, doc))
+
+        self.assertEqual("", captured.getvalue())
 
     def test_discover_wiki_urls_rejects_off_domain_seeds(self) -> None:
         discovered = discover_wiki_urls(

@@ -4,6 +4,7 @@ import argparse
 import pathlib
 import sqlite3
 import sys
+from collections.abc import Iterable
 
 from dotenv import find_dotenv, load_dotenv
 from langchain_community.vectorstores import Chroma
@@ -11,7 +12,8 @@ from langchain_community.vectorstores import Chroma
 if __package__ in {None, ""}:
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from app.ingest.pipeline import build_vector_store, ingest_document
+from app.ingest import IngestDocument, SourceConfig
+from app.ingest.pipeline import ingest_document
 from app.ingest.sources import (
     default_wiki_source,
     discover_wiki_urls,
@@ -20,6 +22,7 @@ from app.ingest.sources import (
     youtube_document_from_transcript,
 )
 from app.ingest.storage import get_db_connection
+from app.rag.vector_store import build_vector_store
 
 load_dotenv(find_dotenv())
 
@@ -65,34 +68,59 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _ingest_documents(
+    conn: sqlite3.Connection,
+    vector_store: Chroma,
+    source_cfg: SourceConfig,
+    docs: Iterable[IngestDocument],
+    *,
+    failure_label: str,
+) -> tuple[int, int]:
+    indexed = 0
+    skipped = 0
+    for doc in docs:
+        try:
+            changed = ingest_document(
+                conn,
+                vector_store,
+                source_cfg,
+                doc,
+                status_writer=print,
+            )
+            if changed:
+                indexed += 1
+            else:
+                skipped += 1
+        except Exception as exc:
+            print(f"Failed to ingest {failure_label} {doc.canonical_uri}: {exc}")
+            skipped += 1
+    return indexed, skipped
+
+
 def _ingest_wiki_urls(
     conn: sqlite3.Connection,
     vector_store: Chroma,
     wiki_urls: list[str],
 ) -> tuple[int, int]:
-    indexed_count = 0
-    skipped_count = 0
-
+    indexed_total = 0
+    skipped_total = 0
     source_cfg = default_wiki_source()
     for wiki_url in wiki_urls:
         doc = wiki_document_from_url(wiki_url, allowed_base_url=source_cfg.base_url)
         if doc is None:
-            skipped_count += 1
+            skipped_total += 1
             continue
+        indexed, skipped = _ingest_documents(
+            conn,
+            vector_store,
+            source_cfg,
+            [doc],
+            failure_label="wiki url",
+        )
+        indexed_total += indexed
+        skipped_total += skipped
 
-        try:
-            changed = ingest_document(conn, vector_store, source_cfg, doc)
-        except Exception as exc:
-            print(f"Failed to ingest wiki url {wiki_url}: {exc}")
-            skipped_count += 1
-            continue
-
-        if changed:
-            indexed_count += 1
-        else:
-            skipped_count += 1
-
-    return indexed_count, skipped_count
+    return indexed_total, skipped_total
 
 
 def _merge_unique_urls(urls: list[str]) -> list[str]:
@@ -114,41 +142,37 @@ def _ingest_discord_exports(
     vector_store: Chroma,
     paths: list[pathlib.Path],
 ) -> tuple[int, int]:
-    indexed_count = 0
-    skipped_count = 0
-
+    indexed_total = 0
+    skipped_total = 0
     for export_path in paths:
         if not export_path.exists():
             print(f"Discord export file not found: {export_path}")
-            skipped_count += 1
+            skipped_total += 1
             continue
 
         try:
             source_cfg, docs = discord_documents_from_export(export_path)
         except Exception as exc:
             print(f"Failed to parse Discord export {export_path}: {exc}")
-            skipped_count += 1
+            skipped_total += 1
             continue
 
         if not docs:
             print(f"No indexable messages in Discord export: {export_path}")
-            skipped_count += 1
+            skipped_total += 1
             continue
 
-        for doc in docs:
-            try:
-                changed = ingest_document(conn, vector_store, source_cfg, doc)
-            except Exception as exc:
-                print(f"Failed to ingest Discord message {doc.canonical_uri}: {exc}")
-                skipped_count += 1
-                continue
+        indexed, skipped = _ingest_documents(
+            conn,
+            vector_store,
+            source_cfg,
+            docs,
+            failure_label="Discord message",
+        )
+        indexed_total += indexed
+        skipped_total += skipped
 
-            if changed:
-                indexed_count += 1
-            else:
-                skipped_count += 1
-
-    return indexed_count, skipped_count
+    return indexed_total, skipped_total
 
 
 def _ingest_youtube_transcripts(
@@ -156,35 +180,32 @@ def _ingest_youtube_transcripts(
     vector_store: Chroma,
     paths: list[pathlib.Path],
 ) -> tuple[int, int]:
-    indexed_count = 0
-    skipped_count = 0
-
+    indexed_total = 0
+    skipped_total = 0
     for transcript_path in paths:
         if not transcript_path.exists():
             print(f"YouTube transcript file not found: {transcript_path}")
-            skipped_count += 1
+            skipped_total += 1
             continue
 
         try:
             source_cfg, doc = youtube_document_from_transcript(transcript_path)
         except Exception as exc:
             print(f"Failed to parse YouTube transcript {transcript_path}: {exc}")
-            skipped_count += 1
+            skipped_total += 1
             continue
 
-        try:
-            changed = ingest_document(conn, vector_store, source_cfg, doc)
-        except Exception as exc:
-            print(f"Failed to ingest YouTube transcript {doc.canonical_uri}: {exc}")
-            skipped_count += 1
-            continue
+        indexed, skipped = _ingest_documents(
+            conn,
+            vector_store,
+            source_cfg,
+            [doc],
+            failure_label="YouTube transcript",
+        )
+        indexed_total += indexed
+        skipped_total += skipped
 
-        if changed:
-            indexed_count += 1
-        else:
-            skipped_count += 1
-
-    return indexed_count, skipped_count
+    return indexed_total, skipped_total
 
 
 def main() -> None:
@@ -218,7 +239,9 @@ def main() -> None:
         wiki_urls = ["https://calamitymod.wiki.gg/wiki/Supreme_Calamitas"]
 
     conn = get_db_connection()
-    vector_store = build_vector_store()
+    vector_store = build_vector_store(
+        missing_key_message="GOOGLE_API_KEY is missing. Set it in .env before running app/indexer.py."
+    )
 
     indexed_total = 0
     skipped_total = 0

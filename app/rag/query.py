@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from typing import Iterable, Optional
+
+from ..settings import DEFAULT_RETRIEVAL_K
+
+SOURCE_TYPE_CHOICES = ("wiki", "discord", "youtube")
 
 
 def normalize_text(value: object) -> Optional[str]:
@@ -109,6 +114,14 @@ class RetrievalFilters:
             return None
         return "; ".join(parts)
 
+    def vector_store_filter(self) -> dict[str, str] | None:
+        filter_data: dict[str, str] = {}
+        if self.game:
+            filter_data["game"] = self.game
+        if self.source_type:
+            filter_data["source_type"] = self.source_type
+        return filter_data or None
+
     def to_dict(self) -> dict:
         return {
             "game": self.game,
@@ -116,3 +129,35 @@ class RetrievalFilters:
             "include_base_game": self.include_base_game,
             "source_type": self.source_type,
         }
+
+
+def add_retrieval_args(
+    parser: argparse.ArgumentParser,
+    *,
+    query_arg_name: str = "query",
+    query_help: str = "Question or search query",
+) -> None:
+    parser.add_argument(query_arg_name, help=query_help)
+    parser.add_argument("--k", type=int, default=DEFAULT_RETRIEVAL_K, help="Number of chunks to return")
+    parser.add_argument(
+        "--source-type",
+        choices=SOURCE_TYPE_CHOICES,
+        default=None,
+        help="Optional source filter",
+    )
+    parser.add_argument("--game", default=None, help="Optional game filter")
+    parser.add_argument("--mod", action="append", default=[], help="Repeatable mod filter")
+    parser.add_argument(
+        "--exclude-base-game",
+        action="store_true",
+        help="When using --mod, exclude base game results.",
+    )
+
+
+def filters_from_args(args: argparse.Namespace) -> RetrievalFilters:
+    return RetrievalFilters.from_inputs(
+        game=args.game,
+        mods=args.mod,
+        include_base_game=not args.exclude_base_game,
+        source_type=args.source_type,
+    )

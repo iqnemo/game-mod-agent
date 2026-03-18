@@ -6,7 +6,7 @@ import sqlite3
 from typing import Optional
 
 from .models import ChunkPayload, SourceConfig
-from ..query import metadata_mods, normalize_text
+from ..rag.query import metadata_mods, normalize_text
 
 DB_PATH = "index/kb.sqlite"
 

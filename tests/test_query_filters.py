@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import argparse
 import sqlite3
 import unittest
 
 from app.db_init import SCHEMA
 from app.ingest.storage import list_available_filters
-from app.query import RetrievalFilters
+from app.rag.query import RetrievalFilters, add_retrieval_args, filters_from_args
 
 
 class QueryFilterTests(unittest.TestCase):
@@ -25,6 +26,41 @@ class QueryFilterTests(unittest.TestCase):
 
         self.assertFalse(filters.matches_metadata({"game": "Terraria", "mod": None}))
         self.assertTrue(filters.matches_metadata({"game": "Terraria", "mod": "Infernum"}))
+
+    def test_vector_store_filter_combines_supported_fields(self) -> None:
+        filters = RetrievalFilters.from_inputs(game="Terraria", source_type="wiki")
+
+        self.assertEqual(
+            {"game": "Terraria", "source_type": "wiki"},
+            filters.vector_store_filter(),
+        )
+
+    def test_filters_from_args_uses_shared_cli_parsing(self) -> None:
+        parser = argparse.ArgumentParser()
+        add_retrieval_args(parser)
+
+        args = parser.parse_args(
+            [
+                "best summon build",
+                "--game",
+                "Terraria",
+                "--mod",
+                "Calamity",
+                "--source-type",
+                "wiki",
+                "--exclude-base-game",
+            ]
+        )
+
+        self.assertEqual(
+            RetrievalFilters.from_inputs(
+                game="Terraria",
+                mods=["Calamity"],
+                include_base_game=False,
+                source_type="wiki",
+            ),
+            filters_from_args(args),
+        )
 
     def test_list_available_filters_groups_mods_by_game(self) -> None:
         conn = sqlite3.connect(":memory:")
