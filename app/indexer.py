@@ -236,7 +236,11 @@ def main() -> None:
         wiki_urls = _merge_unique_urls(wiki_urls + discovered_urls)
 
     if not wiki_urls and not wiki_seeds and not discord_exports and not youtube_transcripts:
-        wiki_urls = ["https://calamitymod.wiki.gg/wiki/Supreme_Calamitas"]
+        print(
+            "No sources specified. Use --wiki-url, --wiki-seed, "
+            "--discord-export, or --youtube-transcript."
+        )
+        return
 
     conn = get_db_connection()
     vector_store = build_vector_store(

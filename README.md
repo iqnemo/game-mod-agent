@@ -1,5 +1,7 @@
 # game-mod-agent
 
+A multi-game, multi-mod RAG (Retrieval-Augmented Generation) pipeline. Ingest knowledge from wikis, Discord exports, and YouTube transcripts, then ask questions and get sourced answers through a web UI or CLI.
+
 ## Quick setup (macOS + VS Code)
 
 1. Clone and switch branch:
@@ -24,7 +26,7 @@
    ```
    Fill in `.env` with:
    - `GOOGLE_API_KEY` (used by embeddings/indexing)
-  - `OPENAI_API_KEY` (used by `smoke_test.py`, or as the QA fallback if you are not using OpenRouter)
+  - `OPENAI_API_KEY` (used by QA, or as the fallback if you are not using OpenRouter)
 5. Open in VS Code:
    ```bash
    code .
@@ -36,9 +38,6 @@
 # initialize sqlite schema
 .venv/bin/python -m app.db_init
 
-# run indexer against seed URLs
-.venv/bin/python -m app.indexer
-
 # run indexer with specific wiki pages
 .venv/bin/python -m app.indexer --wiki-url "https://calamitymod.wiki.gg/wiki/Yharon,_Dragon_of_Rebirth"
 
@@ -49,19 +48,16 @@
 .venv/bin/python -m app.indexer --wiki-seed "https://calamitymod.wiki.gg/wiki/Guide:Class_setups/Post-Moon_Lord" --wiki-max-depth 2 --wiki-max-pages 400
 
 # ingest Discord export JSON (e.g. from DiscordChatExporter)
-.venv/bin/python -m app.indexer --discord-export data/discord/calamity_general.json
+.venv/bin/python -m app.indexer --discord-export data/discord/my_server_export.json
 
 # ingest YouTube transcript JSON
-.venv/bin/python -m app.indexer --youtube-transcript data/youtube/supreme_calamitas_guide.json
+.venv/bin/python -m app.indexer --youtube-transcript data/youtube/my_guide.json
 
 # retrieve top matching chunks
-.venv/bin/python -m app.rag.retriever "how does supreme calamitas phase 2 work?" --k 6
+.venv/bin/python -m app.rag.retriever "how does the final boss phase 2 work?" --k 6
 
 # ask the RAG pipeline a question
-.venv/bin/python -m app.rag.qa "how do i dodge supreme calamitas bullet hell?" --k 6
-
-# quick OpenAI connectivity smoke test
-.venv/bin/python smoke_test.py
+.venv/bin/python -m app.rag.qa "what is the best ranger loadout for endgame?" --k 6
 
 # run regression tests
 .venv/bin/python -m unittest discover -s tests

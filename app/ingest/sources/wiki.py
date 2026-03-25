@@ -22,13 +22,19 @@ WIKI_BLOCKED_NAMESPACES = {
 }
 
 
-def default_wiki_source() -> SourceConfig:
+def default_wiki_source(
+    *,
+    source_key: str = "calamity_wiki",
+    game: str = "Terraria",
+    mod: str | None = "Calamity",
+    base_url: str = "https://calamitymod.wiki.gg",
+) -> SourceConfig:
     return SourceConfig(
-        source_key="calamity_wiki",
+        source_key=source_key,
         source_type="wiki",
-        game="Terraria",
-        mod="Calamity",
-        base_url="https://calamitymod.wiki.gg",
+        game=game,
+        mod=mod,
+        base_url=base_url,
     )
 
 

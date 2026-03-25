@@ -9,10 +9,10 @@ PRAGMA journal_mode = WAL;
 
 CREATE TABLE IF NOT EXISTS sources(
     source_id INTEGER PRIMARY KEY,
-    source_key TEXT UNIQUE NOT NULL,        -- terraria_wiki, calamity_wiki, etc
-    source_type TEXT NOT NULL,              -- wiki, youtube, etc.
-    game TEXT NOT NULL,                     -- Terraria, Minecraft
-    mod TEXT,                               -- Calamity, etc. NULL for base game
+    source_key TEXT UNIQUE NOT NULL,        -- e.g. my_wiki, yt_channel_xyz
+    source_type TEXT NOT NULL,              -- wiki, youtube, discord, etc.
+    game TEXT NOT NULL,                     -- e.g. Terraria, Minecraft
+    mod TEXT,                               -- e.g. Calamity, Create. NULL for base game
     base_url TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
