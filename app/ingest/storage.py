@@ -22,18 +22,15 @@ def get_db_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
 def ensure_source(conn: sqlite3.Connection, source: SourceConfig, now_ts: int) -> int:
     conn.execute(
         """
-        INSERT OR IGNORE INTO sources (source_key, source_type, game, mod, base_url, created_at)
+        INSERT INTO sources (source_key, source_type, game, mod, base_url, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(source_key) DO UPDATE SET
+            source_type = excluded.source_type,
+            game = excluded.game,
+            mod = excluded.mod,
+            base_url = excluded.base_url
         """,
         (source.source_key, source.source_type, source.game, source.mod, source.base_url, now_ts),
-    )
-    conn.execute(
-        """
-        UPDATE sources
-        SET source_type = ?, game = ?, mod = ?, base_url = ?
-        WHERE source_key = ?
-        """,
-        (source.source_type, source.game, source.mod, source.base_url, source.source_key),
     )
     row = conn.execute(
         "SELECT source_id FROM sources WHERE source_key = ?",
@@ -56,20 +53,18 @@ def upsert_document(
 ) -> int:
     conn.execute(
         """
-        INSERT OR IGNORE INTO documents (
+        INSERT INTO documents (
             source_id, content_type, external_id, canonical_uri, title, language, created_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(source_id, canonical_uri) DO UPDATE SET
+            title = excluded.title,
+            language = excluded.language,
+            external_id = excluded.external_id,
+            content_type = excluded.content_type,
+            updated_at = ?
         """,
-        (source_id, content_type, external_id, canonical_uri, title, language, now_ts),
-    )
-    conn.execute(
-        """
-        UPDATE documents
-        SET title = ?, language = ?, updated_at = ?, external_id = ?, content_type = ?
-        WHERE source_id = ? AND canonical_uri = ?
-        """,
-        (title, language, now_ts, external_id, content_type, source_id, canonical_uri),
+        (source_id, content_type, external_id, canonical_uri, title, language, now_ts, now_ts),
     )
     row = conn.execute(
         """
@@ -148,7 +143,7 @@ def store_chunks_in_db(
     conn.executemany(
         """
         INSERT INTO chunks (
-            version_id, chunk_index, text_content, token_count, start_sec, end_sec, metadata_json
+            version_id, chunk_index, text_content, word_count, start_sec, end_sec, metadata_json
         )
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,

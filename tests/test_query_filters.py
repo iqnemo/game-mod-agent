@@ -98,7 +98,7 @@ class QueryFilterTests(unittest.TestCase):
         conn.execute(
             """
             INSERT INTO chunks (
-                version_id, chunk_index, text_content, token_count, start_sec, end_sec, metadata_json
+                version_id, chunk_index, text_content, word_count, start_sec, end_sec, metadata_json
             )
             VALUES
                 (1, 0, 'base', 1, NULL, NULL, '{}'),

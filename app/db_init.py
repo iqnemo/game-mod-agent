@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     version_id INTEGER NOT NULL REFERENCES document_versions(version_id) ON DELETE CASCADE,
     chunk_index INTEGER NOT NULL,
     text_content TEXT NOT NULL,
-    token_count INTEGER,
+    word_count INTEGER,
     start_sec REAL,                           -- for transcript/video time references
     end_sec REAL,                             -- for transcript/video time references
     metadata_json TEXT,                       -- optional extra metadata

@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import logging
 import os
 import pathlib
 import sys
 from typing import Optional
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 import uvicorn
+
+logger = logging.getLogger(__name__)
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
@@ -76,36 +79,50 @@ def filters() -> dict:
 
 
 @app.post("/api/retrieve")
-def retrieve_endpoint(request: RetrieveRequest) -> dict:
-    filters = _build_filters(
-        game=request.game,
-        mods=request.mods,
-        include_base_game=request.include_base_game,
-        source_type=request.source_type,
-    )
-    docs = retrieve(request.query, k=request.k, filters=filters)
-    return {
-        "results": [
-            {
-                "index": index,
-                "metadata": dict(doc.metadata),
-                "text": doc.page_content,
-            }
-            for index, doc in enumerate(docs, start=1)
-        ],
-        "filters": filters.to_dict(),
-    }
+def retrieve_endpoint(request: RetrieveRequest):
+    try:
+        filters = _build_filters(
+            game=request.game,
+            mods=request.mods,
+            include_base_game=request.include_base_game,
+            source_type=request.source_type,
+        )
+        docs = retrieve(request.query, k=request.k, filters=filters)
+        return {
+            "results": [
+                {
+                    "index": index,
+                    "metadata": dict(doc.metadata),
+                    "text": doc.page_content,
+                }
+                for index, doc in enumerate(docs, start=1)
+            ],
+            "filters": filters.to_dict(),
+        }
+    except Exception as exc:
+        logger.exception("Retrieve failed")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(exc)},
+        )
 
 
 @app.post("/api/chat")
-def chat(request: ChatRequest) -> dict:
-    filters = _build_filters(
-        game=request.game,
-        mods=request.mods,
-        include_base_game=request.include_base_game,
-        source_type=request.source_type,
-    )
-    return answer_question_details(request.question, k=request.k, filters=filters)
+def chat(request: ChatRequest):
+    try:
+        filters = _build_filters(
+            game=request.game,
+            mods=request.mods,
+            include_base_game=request.include_base_game,
+            source_type=request.source_type,
+        )
+        return answer_question_details(request.question, k=request.k, filters=filters)
+    except Exception as exc:
+        logger.exception("Chat failed")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(exc)},
+        )
 
 
 @app.get("/")
