@@ -1,6 +1,5 @@
 langchain>=1.2,<2
 langchain-community>=0.4,<1
-langchain-google-genai>=4.2,<5
 chromadb>=1.5,<2
 beautifulsoup4>=4.14,<5
 requests>=2.32,<3

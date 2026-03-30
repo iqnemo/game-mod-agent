@@ -8,7 +8,7 @@ A multi-game, multi-mod RAG (Retrieval-Augmented Generation) pipeline. Ingest kn
    ```bash
    git clone https://github.com/iqnemo/game-mod-agent.git
    cd game-mod-agent
-   git checkout feat/scraper-skeleton
+   git checkout codex/game-rag
    ```
 2. Create and activate a virtual environment:
    ```bash
@@ -25,8 +25,9 @@ A multi-game, multi-mod RAG (Retrieval-Augmented Generation) pipeline. Ingest kn
    cp env.example .env
    ```
    Fill in `.env` with:
-   - `GOOGLE_API_KEY` (used by embeddings/indexing)
-  - `OPENAI_API_KEY` (used by QA, or as the fallback if you are not using OpenRouter)
+   - `OPENROUTER_API_KEY` (used for both embeddings and QA)
+   - Optional `RAG_CHAT_MODEL` for answer generation
+   - Optional `RAG_EMBEDDING_MODEL` for retrieval embeddings
 5. Open in VS Code:
    ```bash
    code .
@@ -77,7 +78,9 @@ A multi-game, multi-mod RAG (Retrieval-Augmented Generation) pipeline. Ingest kn
 - Preferred transcript shape:
   - Root object with optional video metadata (`video_id`, `title`, `channel`, `url`)
   - `segments` or `transcript` list where each item has `text` and optional `start`/`end` (or `duration`)
-- To run QA with OpenRouter, set `RAG_LLM_API_KEY`, `RAG_LLM_BASE_URL=https://openrouter.ai/api/v1`, and `RAG_LLM_MODEL=deepseek/deepseek-v3.2` in `.env`.
-- Optional OpenRouter failover is supported via `RAG_LLM_FALLBACK_MODELS=model_a,model_b`.
+- OpenRouter is the default provider for both embeddings and QA in this repo.
+- Set `OPENROUTER_API_KEY` in `.env` before running indexing, retrieval, or QA.
+- Choose your answer model with `RAG_CHAT_MODEL` and your embedding model with `RAG_EMBEDDING_MODEL`.
+- Optional OpenRouter failover is supported via `OPENROUTER_FALLBACK_MODELS=model_a,model_b`.
 - Retrieval now pulls a larger candidate set and limits repeated chunks from the same source document to improve answer diversity.
 - The web UI supports `game` filtering, repeatable `mod` selection, and includes base game results by default when mods are selected.

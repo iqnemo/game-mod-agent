@@ -16,8 +16,8 @@ from ..settings import (
     LLMConfig,
     DEFAULT_MAX_CONTEXT_CHARS,
     get_int_env,
-    llm_api_key,
     load_llm_config,
+    openrouter_api_key,
 )
 from .query import RetrievalFilters, add_retrieval_args, filters_from_args, metadata_mods
 from .retriever import retrieve
@@ -29,11 +29,11 @@ def get_client(config: Optional[LLMConfig] = None) -> OpenAI:
     config = config or load_llm_config()
     if config.base_url:
         return OpenAI(
-            api_key=llm_api_key(),
+            api_key=openrouter_api_key(),
             base_url=config.base_url,
             default_headers=config.default_headers or None,
         )
-    return OpenAI(api_key=llm_api_key())
+    return OpenAI(api_key=openrouter_api_key())
 
 
 def _format_context_header(index: int, metadata: dict) -> str:

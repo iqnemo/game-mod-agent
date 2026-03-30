@@ -90,7 +90,7 @@ def retrieve(
     filters = filters or RetrievalFilters()
 
     vector_store = build_vector_store(
-        missing_key_message="GOOGLE_API_KEY is missing. Set it in .env before retrieval."
+        missing_key_message="OPENROUTER_API_KEY is missing. Set it in .env before retrieval."
     )
     default_fetch_k = max(k * DEFAULT_FETCH_K_MULTIPLIER, DEFAULT_MIN_FETCH_K)
     if filters.game or filters.mods or filters.source_type:

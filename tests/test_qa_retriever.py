@@ -54,8 +54,8 @@ class QaRetrieverTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "RAG_LLM_BASE_URL": "https://openrouter.ai/api/v1",
-                "RAG_LLM_FALLBACK_MODELS": "deepseek/deepseek-r1,openai/gpt-4o-mini",
+                "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+                "OPENROUTER_FALLBACK_MODELS": "deepseek/deepseek-r1,openai/gpt-4o-mini",
             },
             clear=False,
         ):

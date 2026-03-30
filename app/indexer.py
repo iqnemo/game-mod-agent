@@ -244,7 +244,7 @@ def main() -> None:
 
     conn = get_db_connection()
     vector_store = build_vector_store(
-        missing_key_message="GOOGLE_API_KEY is missing. Set it in .env before running app/indexer.py."
+        missing_key_message="OPENROUTER_API_KEY is missing. Set it in .env before running app/indexer.py."
     )
 
     indexed_total = 0

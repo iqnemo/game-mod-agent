@@ -7,7 +7,6 @@ from urllib.parse import urlparse
 
 CHROMA_DIR = "chroma_db"
 COLLECTION_NAME = "knowledge_base"
-EMBEDDING_MODEL = "models/text-embedding-004"
 
 DEFAULT_RETRIEVAL_K = 6
 DEFAULT_MAX_CONTEXT_CHARS = 8000
@@ -16,8 +15,8 @@ DEFAULT_FETCH_K_MULTIPLIER = 4
 DEFAULT_MIN_FETCH_K = 12
 DEFAULT_FILTERED_FETCH_K = 24
 
-DEFAULT_OPENAI_MODEL = "gpt-5-nano"
-DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v3.2"
+DEFAULT_CHAT_MODEL = "deepseek/deepseek-v3.2"
+DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
 DEFAULT_LLM_TEMPERATURE = 0.2
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_APP_NAME = "game-mod-agent"
@@ -32,6 +31,13 @@ class LLMConfig:
     temperature: float
     default_headers: dict[str, str]
     extra_body: dict[str, object] | None
+
+
+@dataclass(frozen=True)
+class EmbeddingConfig:
+    base_url: str
+    model: str
+    default_headers: dict[str, str]
 
 
 def get_int_env(name: str, default: int, minimum: int = 1) -> int:
@@ -80,40 +86,47 @@ def is_openrouter_base_url(base_url: Optional[str]) -> bool:
     return parsed.netloc.lower() == "openrouter.ai"
 
 
-def default_llm_model(base_url: Optional[str]) -> str:
-    if is_openrouter_base_url(base_url):
-        return DEFAULT_OPENROUTER_MODEL
-    return DEFAULT_OPENAI_MODEL
+def openrouter_base_url() -> str:
+    return normalize_base_url(os.getenv("OPENROUTER_BASE_URL")) or DEFAULT_OPENROUTER_BASE_URL
 
 
-def llm_api_key() -> str:
-    api_key = (os.getenv("RAG_LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
+def openrouter_api_key() -> str:
+    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
     if not api_key:
         raise RuntimeError(
-            "Missing LLM API key. Set RAG_LLM_API_KEY (or OPENAI_API_KEY) in .env."
+            "Missing OpenRouter API key. Set OPENROUTER_API_KEY in .env."
         )
     return api_key
 
 
+def openrouter_headers(base_url: Optional[str] = None) -> dict[str, str]:
+    normalized_base_url = normalize_base_url(base_url) or openrouter_base_url()
+    if not is_openrouter_base_url(normalized_base_url):
+        return {}
+
+    headers: dict[str, str] = {}
+    http_referer = (os.getenv("OPENROUTER_HTTP_REFERER") or "").strip()
+    if http_referer:
+        headers["HTTP-Referer"] = http_referer
+
+    app_name = (os.getenv("OPENROUTER_APP_NAME") or DEFAULT_APP_NAME).strip()
+    if app_name:
+        headers["X-OpenRouter-Title"] = app_name
+
+    return headers
+
+
 def load_llm_config() -> LLMConfig:
-    base_url = normalize_base_url(os.getenv("RAG_LLM_BASE_URL"))
-    default_headers: dict[str, str] = {}
+    base_url = openrouter_base_url()
+    default_headers = openrouter_headers(base_url)
     extra_body: dict[str, object] | None = None
 
     if is_openrouter_base_url(base_url):
-        http_referer = (os.getenv("RAG_LLM_HTTP_REFERER") or "").strip()
-        if http_referer:
-            default_headers["HTTP-Referer"] = http_referer
-
-        app_name = (os.getenv("RAG_LLM_APP_NAME") or DEFAULT_APP_NAME).strip()
-        if app_name:
-            default_headers["X-Title"] = app_name
-
-        fallback_models = parse_csv_env("RAG_LLM_FALLBACK_MODELS")
+        fallback_models = parse_csv_env("OPENROUTER_FALLBACK_MODELS")
         if fallback_models:
             extra_body = {"models": fallback_models}
 
-    model = (os.getenv("RAG_LLM_MODEL") or default_llm_model(base_url)).strip()
+    model = (os.getenv("RAG_CHAT_MODEL") or DEFAULT_CHAT_MODEL).strip()
     temperature = get_float_env("RAG_LLM_TEMPERATURE", DEFAULT_LLM_TEMPERATURE)
 
     return LLMConfig(
@@ -122,4 +135,14 @@ def load_llm_config() -> LLMConfig:
         temperature=temperature,
         default_headers=default_headers,
         extra_body=extra_body,
+    )
+
+
+def load_embedding_config() -> EmbeddingConfig:
+    base_url = openrouter_base_url()
+    model = (os.getenv("RAG_EMBEDDING_MODEL") or DEFAULT_EMBEDDING_MODEL).strip()
+    return EmbeddingConfig(
+        base_url=base_url,
+        model=model,
+        default_headers=openrouter_headers(base_url),
     )
